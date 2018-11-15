@@ -71,30 +71,49 @@ function buildResponse(backendProduct) {
     return {
         statusCode: 200,
         headers: { 'Content-Type': 'application/json' },
-        //body: mapProduct(backendProduct)
-        body: backendProduct
+        body: mapProduct(backendProduct)
+        //body: backendProduct
     };
 }
-
 /**
- * Example conversion of a commerce backend product into a CIF product
- * 
- * @param backendProduct The JSON product data coming from the commerce system backend.
- * @returns a CIF product.
- */
-function mapProduct(backendProduct) {
-    return {
-        id: backendProduct.pid,
-        name: {
-            en: backendProduct.name
-        },
-        prices: [
-            {
-                currency: backendProduct.price.currencyCode,
-                centAmount: backendProduct.price.value * 100
-            }
-        ]
-    };
+* Example conversion of a commerce backend product into a CIF product
+*
+* @param backendProduct The JSON product data coming from the commerce system backend.
+* @returns a CIF product.
+*/
+function mapProduct(backendProduct)
+{
+var product = backendProduct.Product;
+return {
+id: product.ProductId,
+sku: product.DisplaySkuAvailabilities[0].Sku.SkuId,
+name: product.LocalizedProperties[0].ProductTitle,
+// slug: not needed
+description: product.LocalizedProperties[0].ShortDescription,
+categories: [ // assuming categories are similar to availabilities, not aspects.
+{
+id: product.DisplaySkuAvailabilities[0].Availabilities[0].AvailabilityId
+}
+],
+prices: [
+{
+country: product.DisplaySkuAvailabilities[0].Availabilities[0].Markets[0],
+currency: product.DisplaySkuAvailabilities[0].Availabilities[0].OrderManagementData.Price.CurrencyCode,
+amount: product.DisplaySkuAvailabilities[0].Availabilities[0].OrderManagementData.Price.ListPrice
+}
+],
+assets: [
+{
+id: product.DisplaySkuAvailabilities[0].Sku.LocalizedProperties[0].Images[0].Caption, // not really an ID but we don't use id's for images
+url: product.DisplaySkuAvailabilities[0].Sku.LocalizedProperties[0].Images[0].Uri
+}
+],
+// attributes. Too many fields fit here, we will have to reorder them around the CIF product
+createdAt: product.Properties.RevisionId,
+lastModifiedAt: product.DisplaySkuAvailabilities[0].Sku.LastModifiedDate,
+// masterVariantId: we could use P/S/A
+// variants and categories seem similar to our availabilities but with pricing data externally
+};
 }
 
 module.exports.main = main;
