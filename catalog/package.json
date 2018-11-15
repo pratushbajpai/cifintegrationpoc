@@ -1,0 +1,20 @@
+{
+  "name": "getProductFromCatalog",
+  "version": "0.0.2",
+  "main": "getProductById.js",
+  "description": "An example getProductById implementation.",
+  "private": true,
+  "author": {
+    "name": "POC V-Team"
+  },
+  "dependencies": {
+    "clean": "^4.0.2",
+    "node-rest-client": "3.1.0",
+    "zip": "^1.2.0"
+  },
+  "scripts": {
+    "zip": "zip -q -r getProductById.zip getProductById.js package.json node_modules",
+    "update": "wsk -i action update getProductById --kind nodejs:6 --web true getProductById.zip",
+    "deploy": "npm run zip; npm run update"
+  }
+}
