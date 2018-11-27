@@ -1,0 +1,20 @@
+{
+  "name": "productSearchByDevice",
+  "version": "0.0.2",
+  "main": "productSearch.js",
+  "description": "productSearchByProductFamily implementation.",
+  "private": false,
+  "author": {
+    "name": "POC V-Team"
+  },
+  "dependencies": {
+    "clean": "^4.0.2",
+    "node-rest-client": "3.1.0",
+    "zip": "^1.2.0"
+  },
+  "scripts": {
+    "zip": "zip -q -r productSearch.zip productSearch.js package.json node_modules",
+    "update": "wsk -i action update productSearchByProductFamily --kind nodejs:6 --web true productSearch.zip",
+    "deploy": "npm run zip; npm run update"
+  }
+}
