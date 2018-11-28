@@ -16,11 +16,10 @@
 const HttpClient = require('node-rest-client').Client;
 
 // This should point to some commerce backend URL to GET products
-const url = 'https://reco.rec.mp.microsoft.com/channels/reco/v8.0/related/';
+const recoUrl = 'https://reco.rec.mp.microsoft.com/channels/reco/v8.0/related/';
+const catalogUrl = 'https://displaycatalog.mp.microsoft.com/v7.0/products';
 
 function main(args) {
-    let httpClient = new HttpClient();
-
     //set default product id
     let productId = "9NZ0MH20FTWN";
     let market = "us";
@@ -28,7 +27,6 @@ function main(args) {
     let itemType = "apps";
     let deviceFamily = "windows.desktop";
     let count = 10;
-    let clientType = "omnichannel-edge";
 
     if (args.productId) {
         console.log("productId passed " + args.productId);
@@ -60,26 +58,127 @@ function main(args) {
         count = args.count;
     }
 
-    let queryString = itemType + "/" + productId + "?market=" + market + "&language=" + language + "&itemTypes=" + itemType + "&deviceFamily=" + deviceFamily + "&count=" + count + "&clientType=" + clientType + "&isTest=true";
-
     return new Promise((resolve) => {
-        httpClient.get(url + queryString, function (data, response) {
-            console.log("success - raw response object  " + response);
-            console.log("success - raw response data  " + data);
-            return resolve(buildResponse(data));
-        }).on('error', function (err) {
-            console.log("error in call " + err);
-            return resolve(err)
-        });
+        return resolve(getRecoResponse(productId, itemType, market, language, deviceFamily, count));
     });
 }
 
-function buildResponse(recoResponse) {
+async function getRecoResponse(productId, itemType, market, language, deviceFamily, count) {
+    let httpClient = new HttpClient();
+
+    let recoQueryString = itemType + "/" + productId + "?market=" + market + "&language=" + language + "&itemTypes=" + itemType + "&deviceFamily=" + deviceFamily + "&count=" + count + "&clientType=omnichannel-edge&isTest=true";
+
+    var recoResponse = await new Promise((resolve) => {
+        httpClient.get(recoUrl + recoQueryString, function (data) {
+            return resolve(data);
+        }).on('error', function (err) {
+            console.log("error in call " + err);
+            return resolve(err);
+        })
+    });
+
+    let bigIds = [];
+
+    recoResponse.Items.forEach(item => {
+        bigIds.push(item.Id);
+    });
+
+    let catalogQueryString = "?MS-CV=searchproductFamily.cifpoc.0" + "&bigIds=" + bigIds.join(",") + "&market=" + market + "&languages=" + language;
+
+    var catalogResponse = await new Promise((resolve) => {
+        httpClient.get(catalogUrl + catalogQueryString, function (data) {
+            return resolve(data);
+        }).on('error', function (err) {
+            console.log("error in call " + err);
+            return resolve(err);
+        })
+    });
+
+    return buildResponse(recoResponse, catalogResponse);
+}
+
+function buildResponse(recoResponse, catalogResponse) {
+    if (!recoResponse.Items) {
+        console.log("unexpected response from reco %j", recoResponse);
+        return {
+            statusCode: 200,
+            headers: { 'Content-Type': 'application/json' },
+            body: recoResponse
+        };
+    }
+
+    if (!catalogResponse.Products) {
+        console.log("unexpected response from catalog %j", catalogResponse);
+        return {
+            statusCode: 200,
+            headers: { 'Content-Type': 'application/json' },
+            body: catalogResponse
+        };
+    }
+
     return {
         statusCode: 200,
         headers: { 'Content-Type': 'application/json' },
-        body: recoResponse
+        body: mapResponse(recoResponse, catalogResponse)
     };
 }
 
+function mapResponse(recoResponse, catalogResponse) {
+    return {
+        "Title": recoResponse.Title,
+        "Results": mapResults(recoResponse.Items, catalogResponse.Products)
+    };
+}
+
+function mapResults(recoItems, catalogProducts) {
+    return recoItems.map(recoItem => mapResult(recoItem, catalogProducts));
+}
+
+function selectWhere(data, propertyName, value) {
+    for (var i = 0; i < data.length; i++) {
+        if (data[i][propertyName] == value) return data[i];
+    }
+    return null;
+}
+
+function mapResult(recoItem, catalogProducts) {
+    var catalogProduct = selectWhere(catalogProducts, "ProductId", recoItem.Id);
+
+    return {
+        "ItemType": recoItem.ItemType,
+        "Product": [mapProduct(catalogProduct)],
+        "PredictedScore": recoItem.PredictedScore
+    };
+}
+
+function mapProduct(product) {
+    let mappedProduct = {
+        id: product.ProductId,
+        //sku: product.DisplaySkuAvailabilities[0].Sku.SkuId,
+        name: product.LocalizedProperties[0].ProductTitle,
+        // slug: not needed
+        description: product.LocalizedProperties[0].ShortDescription,
+        categories: [ // assuming categories are similar to availabilities, not aspects.
+            {
+                id: product.ProductFamily
+            }
+        ]
+    };
+    if (product.LocalizedProperties[0].Images) {
+        let images = product.LocalizedProperties[0].Images;
+        mappedProduct.assets = images;
+    }
+
+    if (product.DisplaySkuAvailabilities[0].Availabilities[0].OrderManagementData.Price) {
+        let price = product.DisplaySkuAvailabilities[0].Availabilities[0].OrderManagementData.Price;
+        mappedProduct.prices = [
+            {
+                currency: price.CurrencyCode,
+                amount: price.ListPrice
+            }
+        ];
+    }
+
+    return mappedProduct;
+}
 module.exports.main = main;
