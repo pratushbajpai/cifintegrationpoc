@@ -94,10 +94,10 @@ async function getRecoResponse(productId, itemType, market, language, deviceFami
         })
     });
 
-    return buildResponse(recoResponse, catalogResponse);
+    return buildResponse(productId, market, language, recoResponse, catalogResponse);
 }
 
-function buildResponse(recoResponse, catalogResponse) {
+function buildResponse(productId, market, language, recoResponse, catalogResponse) {
     if (!recoResponse.Items) {
         console.log("unexpected response from reco %j", recoResponse);
         return {
@@ -119,14 +119,17 @@ function buildResponse(recoResponse, catalogResponse) {
     return {
         statusCode: 200,
         headers: { 'Content-Type': 'application/json' },
-        body: mapResponse(recoResponse, catalogResponse)
+        body: mapResponse(productId, market, language, recoResponse, catalogResponse)
     };
 }
 
-function mapResponse(recoResponse, catalogResponse) {
+function mapResponse(productId, market, language, recoResponse, catalogResponse) {
     return {
-        "Title": recoResponse.Title,
-        "Results": mapResults(recoResponse.Items, catalogResponse.Products)
+        "title": recoResponse.Title,
+	"id": productId,
+	"market": market,
+	"language": language,
+        "results": mapResults(recoResponse.Items, catalogResponse.Products)
     };
 }
 
@@ -145,32 +148,38 @@ function mapResult(recoItem, catalogProducts) {
     var catalogProduct = selectWhere(catalogProducts, "ProductId", recoItem.Id);
 
     return {
-        "ItemType": recoItem.ItemType,
-        "Product": [mapProduct(catalogProduct)],
-        "PredictedScore": recoItem.PredictedScore
+        "itemType": recoItem.ItemType,
+        "product": [mapProduct(catalogProduct)],
+        "predictedScore": recoItem.PredictedScore
     };
 }
 
-function mapProduct(product) {
+function mapProduct(product)
+{
     let mappedProduct = {
         id: product.ProductId,
-        //sku: product.DisplaySkuAvailabilities[0].Sku.SkuId,
-        name: product.LocalizedProperties[0].ProductTitle,
-        // slug: not needed
-        description: product.LocalizedProperties[0].ShortDescription,
         categories: [ // assuming categories are similar to availabilities, not aspects.
             {
                 id: product.ProductFamily
             }
-        ]
-    };
-    if (product.LocalizedProperties[0].Images) {
-        let images = product.LocalizedProperties[0].Images;
-        mappedProduct.assets = images;
+            ]
+        };
+
+    if(product.LocalizedProperties)
+    {
+        mappedProduct.name = product.LocalizedProperties[0].ProductTitle;
+        mappedProduct.description = product.LocalizedProperties[0].ShortDescription;
     }
 
-    if (product.DisplaySkuAvailabilities[0].Availabilities[0].OrderManagementData.Price) {
-        let price = product.DisplaySkuAvailabilities[0].Availabilities[0].OrderManagementData.Price;
+    if(product.LocalizedProperties[0].Images)
+    {
+        let images =  product.LocalizedProperties[0].Images;
+        mappedProduct.assets = mapImages(images);
+    }
+
+    if(product.DisplaySkuAvailabilities[0].Availabilities[0].OrderManagementData && product.DisplaySkuAvailabilities[0].Availabilities[0].OrderManagementData.Price)
+    {
+        let price =  product.DisplaySkuAvailabilities[0].Availabilities[0].OrderManagementData.Price;
         mappedProduct.prices = [
             {
                 currency: price.CurrencyCode,
@@ -181,4 +190,23 @@ function mapProduct(product) {
 
     return mappedProduct;
 }
+
+function mapImages(images)
+{
+    return images.map(image => mapImage(image));
+}
+
+function mapImage(image)
+{
+    console.log("image object %j", image);
+    return  {
+        id: image.Caption,
+        url: image.Uri,
+        imagePurpose: image.ImagePurpose,
+        height: image.Height,
+        width: image.Width,
+        backgroundColor: image.BackgroundColor
+    }
+}
+
 module.exports.main = main;
