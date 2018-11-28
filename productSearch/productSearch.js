@@ -2,21 +2,23 @@
 
 const HttpClient = require('node-rest-client').Client;
 
+let market = "us";
+
 // This should point to some commerce backend URL to GET products
 const baseurl ="https://displaycatalog.mp.microsoft.com/v7.0/productfamilies/products";
-//'https://displaycatalog.mp.microsoft.com/v7.0/productfamilies/';
+
 let url = baseurl;
 function main(args) {
 
     let httpClient = new HttpClient();
     
-    let market = "us";
     let languages = "neutral"
     let productFamily = "All"
     let query = "*"
     let topProducts = null
     let topFamilies = null
     let skipFamilies = null
+    let mscv = "productsearch.cifpoc.0"
 
     if(args.market)
     {
@@ -59,10 +61,16 @@ function main(args) {
         console.log("$skipFamilies passed " + args.$skipFamilies);
         skipFamilies = args.$skipFamilies;
     }
+
+    if(args.mscv)
+    {
+        console.log("mscv passed " + args.mscv);
+        mscv = args.mscv + ".cifpoc.01";
+    }
     
     url = baseurl;
     
-    let queryString = "?market=" + market + "&languages=" + languages +"&MS-CV=searchproductFamily.cifpoc.0" + "&productFamilyNames="+ productFamily +"&query=" + query;
+    let queryString = "?market=" + market + "&languages=" + languages +"&MS-CV="+ mscv+"&productFamilyNames="+ productFamily +"&query=" + query;
     
     if(skipFamilies)
     {
@@ -84,8 +92,6 @@ function main(args) {
     return new Promise((resolve, reject) => {
         console.log("calling URL  " + url);
         httpClient.get(url + queryString, function (data, response) {
-            //console.log("success - raw response object  %j", response);
-            //console.log("success - raw response data  %j", data);
             return resolve(buildResponse(data));
         }).on('error', function (err) {
             console.log("error in call " + err);
@@ -93,7 +99,6 @@ function main(args) {
         });
     });
 }
-
 function buildResponse(rawResponse) {
 
     if(!rawResponse.Results)
@@ -119,9 +124,8 @@ function mapResponse(rawResponse)
     return {
         "HasMorePages": rawResponse.HasMorePages,
         "TotalFamilyCount": rawResponse.TotalFamilyCount,
-        "Results" :[
+        "Results" :
             mapResults(rawResponse.Results)
-            ]  
     };
 }
 
@@ -135,8 +139,9 @@ function mapResult(result)
 {
     return {
         "ProductFamilyName": result.ProductFamilyName,
-        "Products": [mapProducts(result.Products)],
-        "TotalProductCount": result.TotalProductCount
+        "Products": mapProducts(result.Products),
+        "TotalProductCount": result.TotalProductCount,
+        "Market": market
     };
 }
 function mapProducts(products)
@@ -150,23 +155,26 @@ function mapProduct(product)
     console.log("products object %j", product);
     let mappedProduct = {
         id: product.ProductId,
-        //sku: product.DisplaySkuAvailabilities[0].Sku.SkuId,
-        name: product.LocalizedProperties[0].ProductTitle,
-        // slug: not needed
-        description: product.LocalizedProperties[0].ShortDescription,
         categories: [ // assuming categories are similar to availabilities, not aspects.
-        {
-            id: product.ProductFamily
-        }
-        ]
+            {
+                id: product.ProductFamily
+            }
+            ]
         };
+    
+    if(product.LocalizedProperties)
+    {
+        mappedProduct.name = product.LocalizedProperties[0].ProductTitle;
+        mappedProduct.description = product.LocalizedProperties[0].ShortDescription;
+    }
+
     if(product.LocalizedProperties[0].Images)
     {
         let images =  product.LocalizedProperties[0].Images;
-        mappedProduct.assets = images;
+        mappedProduct.assets = mapImages(images);
     }
 
-    if(product.DisplaySkuAvailabilities[0].Availabilities[0].OrderManagementData.Price)
+    if(product.DisplaySkuAvailabilities[0].Availabilities[0].OrderManagementData && product.DisplaySkuAvailabilities[0].Availabilities[0].OrderManagementData.Price)
     {
         let price =  product.DisplaySkuAvailabilities[0].Availabilities[0].OrderManagementData.Price;
         mappedProduct.prices = [
@@ -180,4 +188,21 @@ function mapProduct(product)
     return mappedProduct;
 }
 
+function mapImages(images)
+{
+    return images.map(image => mapImage(image));
+}
+
+function mapImage(image)
+{
+    console.log("image object %j", image);
+    return  {
+        id: image.Caption,
+        url: image.Uri,
+        imagePurpose: image.ImagePurpose,
+        height: image.Height,
+        width: image.Width,
+        backgroundColor: image.BackgroundColor
+    }
+}
 module.exports.main = main;
