@@ -1,6 +1,6 @@
 {
   "name": "getRelatedProductsByProductId",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "main": "getRelatedProductsByProductId.js",
   "description": "An example getRelatedProductsByProductId implementation.",
   "private": true,
@@ -13,7 +13,7 @@
     "zip": "^1.2.0"
   },
   "scripts": {
-    "zip": "zip -q -r getRelatedProductsByProductId.zip getRelatedProductsByProductId.js package.json node_modules",
+    "zip": "zip -q -r getRelatedProductsByProductId.zip getRelatedProductsByProductId.js package.json node_modules mapProduct.js",
     "update": "wsk -i action update getRelatedProductsByProductId --kind nodejs:6 --web true getRelatedProductsByProductId.zip",
     "deploy": "npm run zip; npm run update"
   }
