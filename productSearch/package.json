@@ -1,6 +1,6 @@
 {
   "name": "productSearch",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "main": "productSearch.js",
   "description": "An example productSearch implementation.",
   "private": false,
@@ -13,7 +13,7 @@
     "zip": "^1.2.0"
   },
   "scripts": {
-    "zip": "zip -q -r productSearch.zip productSearch.js package.json node_modules",
+    "zip": "zip -q -r productSearch.zip productSearch.js package.json node_modules mapProduct.js",
     "update": "wsk -i action update productSearch --kind nodejs:6 --web true productSearch.zip",
     "deploy": "npm run zip; npm run update"
   }
