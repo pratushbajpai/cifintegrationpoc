@@ -1,0 +1,20 @@
+{
+  "name": "getCollectionByKey",
+  "version": "0.0.4",
+  "main": "getCollectionByKey.js",
+  "description": "An example getCollectionByKey implementation.",
+  "private": true,
+  "author": {
+    "name": "POC V-Team"
+  },
+  "dependencies": {
+    "clean": "^4.0.2",
+    "node-rest-client": "3.1.0",
+    "zip": "^1.2.0"
+  },
+  "scripts": {
+    "zip": "zip -q -r getCollectionByKey.zip getCollectionByKey.js package.json node_modules mapProduct.js",
+    "update": "wsk -i action update getCollectionByKey --kind nodejs:6 --web true getCollectionByKey.zip",
+    "deploy": "npm run zip; npm run update"
+  }
+}
