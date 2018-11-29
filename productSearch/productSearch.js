@@ -1,6 +1,7 @@
 'use strict';
 
 const HttpClient = require('node-rest-client').Client;
+let mp = require('./mapProduct');
 
 let market = "us";
 
@@ -147,62 +148,7 @@ function mapResult(result)
 function mapProducts(products)
 {
     //console.log("products object %j", products);
-    return products.map(product => mapProduct(product));
+    return products.map(product => mp.mapProduct(product));
 }
 
-function mapProduct(product)
-{
-    console.log("products object %j", product);
-    let mappedProduct = {
-        id: product.ProductId,
-        categories: [ // assuming categories are similar to availabilities, not aspects.
-            {
-                id: product.ProductFamily
-            }
-            ]
-        };
-    
-    if(product.LocalizedProperties)
-    {
-        mappedProduct.name = product.LocalizedProperties[0].ProductTitle;
-        mappedProduct.description = product.LocalizedProperties[0].ShortDescription;
-    }
-
-    if(product.LocalizedProperties[0].Images)
-    {
-        let images =  product.LocalizedProperties[0].Images;
-        mappedProduct.assets = mapImages(images);
-    }
-
-    if(product.DisplaySkuAvailabilities[0].Availabilities[0].OrderManagementData && product.DisplaySkuAvailabilities[0].Availabilities[0].OrderManagementData.Price)
-    {
-        let price =  product.DisplaySkuAvailabilities[0].Availabilities[0].OrderManagementData.Price;
-        mappedProduct.prices = [
-            {
-                currency: price.CurrencyCode,
-                amount: price.ListPrice
-            }
-        ];
-    }
-    
-    return mappedProduct;
-}
-
-function mapImages(images)
-{
-    return images.map(image => mapImage(image));
-}
-
-function mapImage(image)
-{
-    console.log("image object %j", image);
-    return  {
-        id: image.Caption,
-        url: image.Uri,
-        imagePurpose: image.ImagePurpose,
-        height: image.Height,
-        width: image.Width,
-        backgroundColor: image.BackgroundColor
-    }
-}
 module.exports.main = main;
