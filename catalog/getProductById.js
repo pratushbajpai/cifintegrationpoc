@@ -1,16 +1,3 @@
-/*******************************************************************************
- *
- *    Copyright 2018 Adobe. All rights reserved.
- *    This file is licensed to you under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License. You may obtain a copy
- *    of the License at http://www.apache.org/licenses/LICENSE-2.0
- *
- *    Unless required by applicable law or agreed to in writing, software distributed under
- *    the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR REPRESENTATIONS
- *    OF ANY KIND, either express or implied. See the License for the specific language
- *    governing permissions and limitations under the License.
- *
- ******************************************************************************/
 'use strict';
 
 const HttpClient = require('node-rest-client').Client;
@@ -40,12 +27,20 @@ function main(args) {
         console.log("id passed " + args.id);
         productId = args.id;
     }
-
+    let mscv = productId+".search.cifpoc.0"
+    
     if(args.market)
     {
         console.log("market passed " + args.market);
         market = args.market;
     }
+
+    if(args.mscv)
+    {
+        console.log("mscv passed " + args.mscv);
+        mscv = args.mscv + "search.cifpoc.0";
+    }
+
 
     if(args.languages)
     {
@@ -53,7 +48,7 @@ function main(args) {
         languages = args.languages;
     }
     
-    let queryString = "?productId=" + productId + "&market=" + market + "&languages=" + languages +"&MS-CV="+productId+".cifpoc.0";
+    let queryString = "?productId=" + productId + "&market=" + market + "&languages=" + languages +"&MS-CV="+mscv;
     
     return new Promise((resolve, reject) => {
         httpClient.get(url + queryString, function (data, response) {
@@ -68,6 +63,17 @@ function main(args) {
 }
 
 function buildResponse(backendProduct) {
+    if(!backendProduct.Product)
+    {
+        return {
+            statusCode :404,
+            headers: { 'Content-Type': 'application/json' },
+            body: {
+                code:"ProductNotFound",
+                description: "catalog product not found"
+            }
+        }
+    }
     return {
         statusCode: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -75,45 +81,86 @@ function buildResponse(backendProduct) {
         //body: backendProduct
     };
 }
-/**
-* Example conversion of a commerce backend product into a CIF product
-*
-* @param backendProduct The JSON product data coming from the commerce system backend.
-* @returns a CIF product.
-*/
 function mapProduct(backendProduct)
 {
-var product = backendProduct.Product;
-return {
-id: product.ProductId,
-sku: product.DisplaySkuAvailabilities[0].Sku.SkuId,
-name: product.LocalizedProperties[0].ProductTitle,
-// slug: not needed
-description: product.LocalizedProperties[0].ShortDescription,
-categories: [ // assuming categories are similar to availabilities, not aspects.
-{
-id: product.DisplaySkuAvailabilities[0].Availabilities[0].AvailabilityId
-}
-],
-prices: [
-{
-country: product.DisplaySkuAvailabilities[0].Availabilities[0].Markets[0],
-currency: product.DisplaySkuAvailabilities[0].Availabilities[0].OrderManagementData.Price.CurrencyCode,
-amount: product.DisplaySkuAvailabilities[0].Availabilities[0].OrderManagementData.Price.ListPrice
-}
-],
-assets: [
-{
-id: product.DisplaySkuAvailabilities[0].Sku.LocalizedProperties[0].Images[0].Caption, // not really an ID but we don't use id's for images
-url: product.DisplaySkuAvailabilities[0].Sku.LocalizedProperties[0].Images[0].Uri
-}
-],
-// attributes. Too many fields fit here, we will have to reorder them around the CIF product
-createdAt: product.Properties.RevisionId,
-lastModifiedAt: product.DisplaySkuAvailabilities[0].Sku.LastModifiedDate,
-// masterVariantId: we could use P/S/A
-// variants and categories seem similar to our availabilities but with pricing data externally
-};
+    var product = backendProduct.Product;
+    var mappedProduct = {
+    id: product.ProductId,
+    //sku: product.DisplaySkuAvailabilities[0].Sku.SkuId,
+    //name: product.LocalizedProperties[0].ProductTitle,
+    //description: product.LocalizedProperties[0].ShortDescription,
+    categories: [ // assuming categories are similar to availabilities, not aspects.
+        {
+            id: product.ProductFamily//product.DisplaySkuAvailabilities[0].Availabilities[0].AvailabilityId
+        }
+        ]
+    };
+    if(product.DisplaySkuAvailabilities)
+    {
+        if(product.DisplaySkuAvailabilities[0].Sku)
+        {
+            mappedProduct.sku = product.DisplaySkuAvailabilities[0].Sku.SkuId;
+            mappedProduct.lastModifiedAt = product.DisplaySkuAvailabilities[0].Sku.LastModifiedDate;
+        }
+        if(product.DisplaySkuAvailabilities[0].Availabilities)
+        {
+            mappedProduct.masterVariantId = product.DisplaySkuAvailabilities[0].Availabilities[0].AvailabilityId;
+
+            if(product.DisplaySkuAvailabilities[0].Availabilities[0].OrderManagementData)
+            {
+                let price =  product.DisplaySkuAvailabilities[0].Availabilities[0].OrderManagementData.Price;
+                let market = null
+                if(product.DisplaySkuAvailabilities[0].Availabilities[0].Markets)
+                {
+                    market = product.DisplaySkuAvailabilities[0].Availabilities[0].Markets[0];
+                }
+                if(price)
+                {
+                    mappedProduct.prices = [
+                        {
+                        country: market,
+                        currency: price.CurrencyCode,
+                        amount: price.ListPrice
+                        }
+                    ];
+                }
+            }
+        }
+    }
+    
+    if(product.Properties)
+    {
+        mappedProduct.createdAt = product.Properties.RevisionId;
+    }
+    if(product.LocalizedProperties)
+    {
+        mappedProduct.name = product.LocalizedProperties[0].ProductTitle;
+        mappedProduct.description = product.LocalizedProperties[0].ShortDescription;
+    }
+    if(product.LocalizedProperties[0].Images)
+    {
+        let images =  product.LocalizedProperties[0].Images;
+        mappedProduct.assets = mapImages(images);
+    }
+
+    return mappedProduct;
 }
 
+function mapImages(images)
+{
+    return images.map(image => mapImage(image));
+}
+
+function mapImage(image)
+{
+    console.log("image object %j", image);
+    return  {
+        id: image.Caption,
+        url: image.Uri,
+        imagePurpose: image.ImagePurpose,
+        height: image.Height,
+        width: image.Width,
+        backgroundColor: image.BackgroundColor
+    }
+}
 module.exports.main = main;
