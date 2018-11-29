@@ -13,7 +13,7 @@
     "zip": "^1.2.0"
   },
   "scripts": {
-    "zip": "zip -q -r getProductById.zip getProductById.js package.json node_modules",
+    "zip": "zip -q -r getProductById.zip getProductById.js package.json node_modules ../common/mapProduct.js",
     "update": "wsk -i action update getProductById --kind nodejs:6 --web true getProductById.zip",
     "deploy": "npm run zip; npm run update"
   }

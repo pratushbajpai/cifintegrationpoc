@@ -1,18 +1,10 @@
 'use strict';
+//let mp = require('./mapProduct');
 
 const HttpClient = require('node-rest-client').Client;
 
 // This should point to some commerce backend URL to GET products
 const url = 'https://displaycatalog.mp.microsoft.com/v7.0/products';
-
-let sampleProductData = {
-    pid: '123',
-    name: 'A simple name',
-    price: {
-        currencyCode: 'USD',
-        value: 10
-    }
-}
 
 function main(args) {
 
@@ -77,24 +69,22 @@ function buildResponse(backendProduct) {
     return {
         statusCode: 200,
         headers: { 'Content-Type': 'application/json' },
-        body: mapProduct(backendProduct)
-        //body: backendProduct
+        body: mapProduct(backendProduct.Product)
     };
 }
-function mapProduct(backendProduct)
+
+function mapProduct(product)
 {
-    var product = backendProduct.Product;
     var mappedProduct = {
     id: product.ProductId,
-    //sku: product.DisplaySkuAvailabilities[0].Sku.SkuId,
-    //name: product.LocalizedProperties[0].ProductTitle,
-    //description: product.LocalizedProperties[0].ShortDescription,
+    
     categories: [ // assuming categories are similar to availabilities, not aspects.
         {
             id: product.ProductFamily//product.DisplaySkuAvailabilities[0].Availabilities[0].AvailabilityId
         }
         ]
     };
+    
     if(product.DisplaySkuAvailabilities)
     {
         if(product.DisplaySkuAvailabilities[0].Sku)
